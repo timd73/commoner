@@ -1027,9 +1027,9 @@ function Commoner() {
             need this while looking at the board, not after scrolling past
             it (real feedback — see v6 note in the header comment). */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px 12px", margin: "8px 0 2px", fontSize: 10.5, color: C.faint }}>
-          <span><span style={{ ...swatch, background: C.green }} />locked in</span>
-          <span><span style={{ ...swatch, background: C.yellow }} />tried here, wrong</span>
-          <span><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} />not solved yet</span>
+          <span><span style={{ ...swatch, background: C.green }} />right!</span>
+          <span><span style={{ ...swatch, background: C.yellow }} />wrong rank</span>
+          <span><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} />drag to rank</span>
         </div>
 
         {/* board */}
@@ -1236,15 +1236,15 @@ function HowToPlay({ onClose, maxGuesses }) {
         </div>
 
         <HowStep n="1">Rank 5 words from <b>most</b> to <b>least</b> commonly used in everyday English.</HowStep>
-        <HowStep n="2">Drag a card to reorder it, or tap two cards to swap them.</HowStep>
-        <HowStep n="3">Submit your order. A correct rank <b>locks green</b>, permanently.</HowStep>
-        <HowStep n="4">Wrong guesses show up as small yellow tiles next to that rank — they stay put even as you keep rearranging, so you can compare guesses side by side.</HowStep>
+        <HowStep n="2">Drag a card to reorder it or tap two cards to swap them.</HowStep>
+        <HowStep n="3">Submit your order. A correct rank <b>locks green</b> permanently.</HowStep>
+        <HowStep n="4">Wrong guesses appear as yellow tiles to the right so you can compare guesses.</HowStep>
         <HowStep n="5">You get {maxGuesses} tries. All green means solved.</HowStep>
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid " + C.line, fontSize: 12.5, lineHeight: 2 }}>
           <div><span style={{ ...swatch, background: C.green }} /><b>green</b> — correct rank, locked in</div>
-          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — a past guess that was wrong here</div>
-          <div><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} /><b>white</b> — this rank isn't solved yet</div>
+          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — a past guess - wrong rank</div>
+          <div><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} /><b>white</b> — rank not solved yet</div>
         </div>
 
         <button onClick={onClose} style={{
