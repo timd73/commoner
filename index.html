@@ -50,8 +50,8 @@
       GREEN  = this rank is solved. The draggable tile locks here forever
                and expands to fill the row.
       YELLOW = a BRIEF flash (see v15, FLASH_MS), never a lasting mark.
-               Right after a wrong guess, the tile flashes yellow for
-               ~1s then fades back to neutral — Connections-style, not
+               Right after a wrong guess, the tile fades yellow in, holds,
+               then fades back to neutral — Connections-style, not
                Wordle-style. Nothing on the live board remembers it.
       WHITE  = the draggable tile's resting state: not solved yet, and
                (once the flash fades) carries no memory of past guesses.
@@ -468,6 +468,13 @@
   button:focus-visible { outline: 3px solid #20291F; outline-offset: 2px; }
   @keyframes pop { 0% { transform: scale(.85); opacity: .4 } 100% { transform: scale(1); opacity: 1 } }
   @keyframes grow { from { width: 0 } }
+  /* v15 flash: ease yellow in, hold, ease out — not a hard on/off toggle */
+  @keyframes yellowFlash {
+    0%   { background-color: #F8F8F2; border-color: #C4CBBE; color: #20291F; }
+    18%  { background-color: #C0912A; border-color: #96701E; color: #F4F5F0; }
+    52%  { background-color: #C0912A; border-color: #96701E; color: #F4F5F0; }
+    100% { background-color: #F8F8F2; border-color: #C4CBBE; color: #20291F; }
+  }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
 </style>
 </head>
@@ -481,7 +488,7 @@ const { useState, useMemo, useRef, useEffect } = React;
 const CONFIG = {
   GAME_NAME: "Commoner",
   MAX_GUESSES: 3,
-  FLASH_MS: 1000,             // v15: how long a wrong slot flashes yellow
+  FLASH_MS: 1100,             // v15: yellow fade-in → hold → fade-out duration
   SHOW_THEME: false,          // blind guess 1 (themes exist in data)
   EPOCH: "2026-07-15",        // day of puzzle #1 (local midnight boundary)
   SHARE_URL: "https://timd73.github.io/commoner/",
@@ -1159,9 +1166,12 @@ function Commoner() {
               // from a flashing tile doesn't paint whatever slides in
               // next to it.
               const flashing = !locked && flashGuess && flashGuess.order[pos] === wordIdx && flashGuess.colors[pos] === "yellow";
-              const bg = locked ? C.green : flashing ? C.yellow : C.card;
-              const borderColor = locked ? "#2E6B44" : flashing ? "#96701E" : (isSel ? C.ink : C.line);
-              const litUp = locked || flashing;
+              // Yellow is animated via yellowFlash (fade in → hold → fade out),
+              // not a static bg swap — keep resting card colors here so the
+              // keyframes can ease from/to them cleanly.
+              const bg = locked ? C.green : C.card;
+              const borderColor = locked ? "#2E6B44" : (isSel ? C.ink : C.line);
+              const litUp = locked;
               return (
                 <button
                   key={puzzle.words[wordIdx].w}
@@ -1179,7 +1189,9 @@ function Commoner() {
                     transform: isDragged
                       ? "translateY(" + drag.delta + "px) scale(1.02)"
                       : "translateY(" + tileShift(pos) + "px)" + (isSel ? " translate(-2px,-2px)" : ""),
-                    transition: isDragged ? "none" : "transform .15s, background .5s ease-out, border-color .5s ease-out, box-shadow .12s",
+                    // Skip bg/border transitions while the flash keyframes own those props
+                    transition: isDragged || flashing ? "none" : "transform .15s, background .5s ease-out, border-color .5s ease-out, box-shadow .12s",
+                    animation: flashing ? "yellowFlash " + CONFIG.FLASH_MS + "ms ease-in-out forwards" : "none",
                     zIndex: isDragged ? 10 : 1,
                     position: "relative",
                     touchAction: "none",
@@ -1191,10 +1203,10 @@ function Commoner() {
                     opacity: done && !locked ? 0.95 : 1,
                   }}
                 >
-                  <span style={{ fontSize: 11, color: litUp ? "rgba(244,245,240,.6)" : C.faint, minWidth: 14 }}>{pos + 1}</span>
+                  <span style={{ fontSize: 11, color: flashing ? "inherit" : litUp ? "rgba(244,245,240,.6)" : C.faint, opacity: flashing ? 0.65 : 1, minWidth: 14 }}>{pos + 1}</span>
                   <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{puzzle.words[wordIdx].w}</span>
                   {!done && (
-                    <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: isSel ? C.ink : litUp ? "rgba(244,245,240,.75)" : C.line, flexShrink: 0 }}>
+                    <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: flashing ? "inherit" : isSel ? C.ink : litUp ? "rgba(244,245,240,.75)" : C.line, opacity: flashing ? 0.75 : 1, flexShrink: 0 }}>
                       {locked ? "✓" : isSel ? "TAP ANOTHER TO SWAP" : "⠿"}
                     </span>
                   )}
