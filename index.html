@@ -44,20 +44,24 @@
   ── THE GAME ────────────────────────────────────────────────────────────────
   One puzzle per day. Player is shown 5 words in a scrambled order and must
   rank them from MOST to LEAST commonly used in everyday English, in at most
-  3 guesses. Each rank slot is scored independently and PERMANENTLY once
-  solved (see v13 — this replaced a per-guess "positional distance" model):
+  3 guesses, and cannot resubmit an identical arrangement twice (see v16).
+  Each rank slot is scored independently and PERMANENTLY once
+  solved:
       GREEN  = this rank is solved. The draggable tile locks here forever
                and expands to fill the row.
-      YELLOW = NEVER appears on the draggable tile itself. It only shows
-               up in a small non-moving "record" strip to the right of an
-               unsolved rank — one chip per past guess that was wrong here.
-      WHITE  = the draggable tile's only other state: not solved yet. It
-               is never colored by a guess the way it used to be — moving
-               it around never changes anything about what it displays.
-  Win = all green. Share artifact is a Wordle-style emoji grid (one row per
-  guess): e.g.  "Commoner #14 — 3/4" + rows of squares emoji + URL — the
-  underlying per-position green/yellow scoring that builds this grid is
-  unchanged by v13; only how it's DISPLAYED live on the board changed.
+      YELLOW = a BRIEF flash (see v15, FLASH_MS), never a lasting mark.
+               Right after a wrong guess, the tile flashes yellow for
+               ~1s then fades back to neutral — Connections-style, not
+               Wordle-style. Nothing on the live board remembers it.
+      WHITE  = the draggable tile's resting state: not solved yet, and
+               (once the flash fades) carries no memory of past guesses.
+  Win = all green. The board itself never shows guess history beyond the
+  next flash — the ONLY place to review the full green/yellow history is
+  the Results overlay at game end, which renders the same grid the share
+  text uses (see v15). Share artifact is a Wordle-style emoji grid (one
+  row per guess): e.g. "Commoner #14 — 3/4" + rows of squares emoji + URL
+  — the underlying per-position scoring that builds this grid has NEVER
+  changed across v13/v15; only how much of it is ever shown live changed.
   The theme of each word set exists in data but is NOT shown (blind guess 1).
 
   ── DESIGN HISTORY / WHY IT IS THE WAY IT IS (hard-won, don't regress) ──────
@@ -195,7 +199,47 @@
     word-rank/ never had real players on it, so its redirect skips
     mentioning the brief WordRank era and goes straight "WordRank →
     Commoner," same shape as the original parlance/ -> word-rank/ stub.
-  * v14 (CURRENT, retention-driven resequencing, 2026-07-19): the theory —
+  * v16 (CURRENT): reverted v15's per-slot repeat guard back to a
+    whole-arrangement-only guard (`alreadyGuessed`, matches Connections'
+    real rule) — the per-slot version made satisfying the guard a
+    mechanical shuffle-until-unlocked exercise requiring no reasoning, and
+    blocked deliberately changing only 1-2 tiles while keeping the rest of
+    a good guess. Button copy reverted too: "ALREADY TRIED THAT SPOT" →
+    "ALREADY TRIED THIS ORDER". The flash-not-chip mechanic itself (rest of
+    v15) is unchanged.
+  * v15 (Connections-style flash + per-slot repeat guard,
+    2026-07-19): v13's inline record CHIPS are gone, replaced by a much
+    lighter mechanic explicitly modeled on NYT Connections: a wrong slot
+    flashes yellow for FLASH_MS (~1s) right after submit, via the
+    `flashGuess` state, then fades to neutral — no lasting mark anywhere
+    on the board, not even the "expand on solve" row it used to overwrite.
+    This is a real, deliberate trade-off, discussed and confirmed before
+    building it, not a silent regression: Connections doesn't need a
+    persistent record because every guess presents a fresh set of tiles
+    (the "memory" is just which groups are already solved); THIS game
+    reorders the SAME 5 words every guess, so removing all on-board
+    history means players can no longer cross-reference past guesses to
+    deduce the answer WHILE PLAYING — only a single flash of feedback,
+    then short-term memory. The one place ANY guess history survives is
+    the Results overlay, which now renders the same green/yellow emoji
+    grid the share text builds (see ResultsOverlay) — reviewable only
+    after the game ends, win or lose.
+    Losing that live memory aid made one thing newly dangerous: without a
+    chip reminding you "this word already failed here," a player could
+    burn one of only 3 tries re-testing a (position, word) pair they'd
+    already falsified, for zero new information. Fix: `repeatsSlot`
+    replaces the old `alreadyGuessed` (whole-arrangement-only) guard with
+    a per-slot one — submit is blocked if ANY unsolved rank's current word
+    has occupied that exact rank in any past guess (solved/locked ranks
+    are excluded, since their word can't change). This SUBSUMES the old
+    check (an identical full resubmit trivially repeats every slot too)
+    and has a nice side effect: it forces the player to change every
+    still-open slot on every guess, which quietly preserves some
+    deduction pressure even though nothing on screen explains why.
+    Button copy changed accordingly: "ALREADY TRIED THIS ORDER" (described
+    the old whole-arrangement check) → "ALREADY TRIED THAT SPOT" (describes
+    the new per-slot one).
+  * v14 (retention-driven resequencing, 2026-07-19): the theory —
     a rough early puzzle can suppress next-day return for a big cohort of
     newcomers, and puzzle #2 ("Around the sink," 2026-07-16, this cohort's
     first full day) had three adjacent 0.07-0.08 gaps, essentially a coin
@@ -262,11 +306,16 @@
     record strips fit without pushing the board below the fold — see the
     v6 mobile-fit note; the same "verify on a real small viewport, don't
     eyeball a desktop window" rule applies to this layout too.
-  * SUPERSEDED BY v13 — kept for history, not current behavior: a card
-    used to wear its verdict color ONLY while it remained in the position
-    it was judged in; moving it reverted it to neutral (verdicts were
-    about positions, not words). Self-teaching in theory; confusing during
-    ordinary reordering in practice — see v13.
+  * SUPERSEDED BY v15 — kept for history, not current behavior: v13's
+    entire premise (a small per-rank "record" strip of yellow chips,
+    fixed columns by guess index, never disappearing until the rank
+    solved) is gone. See v15 for why (modeled on Connections instead) and
+    for the real trade-off that came with it.
+  * SUPERSEDED BY v13, and now v15 too — kept for history, not current
+    behavior: a card used to wear its verdict color ONLY while it remained
+    in the position it was judged in; moving it reverted it to neutral
+    (verdicts were about positions, not words). Self-teaching in theory;
+    confusing during ordinary reordering in practice — see v13, then v15.
   * v3.1 (playtest, day 1): rules were a one-time intro line that vanished
     on first interaction — a real player forgot gold-vs-red mid-game and
     resubmitted their guess-1 arrangement as guess 4 (X/4). Rules + color
@@ -317,18 +366,11 @@
   number is real — ordinary polysemy that doesn't change the obvious
   meaning is fine too. Verify every set against wordfreq before shipping
   it; the corpus is the referee, even when it contradicts intuition.
-  Since v13, ALSO check every set's record-chip truncation (see
-  `word.slice(0, 4)` in the board render): no two words in the SAME set
-  may share the same first-4-letter prefix, or their yellow chips become
-  indistinguishable (a false "collision" — the board would look like it's
-  showing the same word twice). Checked by hand across all 30 current sets
-  (2026-07-19, post-v13) — zero exact 4-letter collisions and zero
-  first-3-letter near-collisions anywhere in the bank, and every word from
-  the 3-letter shortest (OWL) to the 14-letter longest (PALEONTOLOGIST)
-  renders cleanly in the fixed-width chip. This is NOT enforced by code —
-  it's a hand-verification step, so re-run it (or write a quick script:
-  group each set's words by their first 4 letters, flag any group with
-  >1 word) whenever new sets are added.
+  RETIRED (v13-only, moot as of v15): sets used to also need checking for
+  record-chip truncation collisions (no two words in a set sharing a
+  first-4-letter prefix). v15 removed the chip UI entirely, so that
+  constraint no longer applies to anything on screen — no need to
+  re-check it for new sets going forward.
 
   ── ROADMAP / OPEN THREADS ──────────────────────────────────────────────────
   * PUZZLES has 30 verified sets (see v9) — the list repeats starting
@@ -439,6 +481,7 @@ const { useState, useMemo, useRef, useEffect } = React;
 const CONFIG = {
   GAME_NAME: "Commoner",
   MAX_GUESSES: 3,
+  FLASH_MS: 1000,             // v15: how long a wrong slot flashes yellow
   SHOW_THEME: false,          // blind guess 1 (themes exist in data)
   EPOCH: "2026-07-15",        // day of puzzle #1 (local midnight boundary)
   SHARE_URL: "https://timd73.github.io/commoner/",
@@ -834,6 +877,10 @@ function Commoner() {
   const rowHRef = useRef(62);
   const [drag, setDrag] = useState(null); // {from, startY, delta, moved}
 
+  // v15: the just-submitted guess, shown as a brief yellow flash on wrong
+  // slots, then cleared — see the tile render below and FLASH_MS in CONFIG.
+  const [flashGuess, setFlashGuess] = useState(null); // { order, colors } | null
+
   const done = status !== "playing";
 
   /* ---------- v13: solved-forever positions, not "last guess" verdicts ----------
@@ -937,9 +984,17 @@ function Commoner() {
     return (newPos - pos) * rowHRef.current;
   };
 
-  // Guardrail (playtest): block resubmitting ANY previous arrangement,
-  // not just the immediately preceding one — a confused player burned
-  // their final guess re-trying their guess-1 order.
+  // v16: reverted to whole-arrangement-only blocking — matches Connections'
+  // actual rule ("can't resubmit the identical guess," nothing more).
+  // v15's per-slot guard forced every unsolved rank to change every guess;
+  // satisfying that required no reasoning (shuffle until the button
+  // unlocks) and blocked deliberate incremental refinement — changing only
+  // the 1-2 tiles you have a new theory about, leaving the rest as your
+  // best guess. The "wasted guess on a known-bad slot" risk this reopens
+  // is accepted: it's the same memory-reliant friction already signed up
+  // for when the chip record was removed in favor of flash-then-forget
+  // (see v15) — noticing and remembering the flash is now part of the
+  // skill test, not a gap to engineer around.
   const alreadyGuessed = guesses.some((g) => g.order.join(",") === order.join(","));
 
   // Stats update exactly once per real day (guarded by lastCompletedDay).
@@ -969,6 +1024,12 @@ function Commoner() {
     const colors = scoreGuess(order);
     const next = [...guesses, { order: [...order], colors }];
     setGuesses(next);
+    // v15: wrong slots flash yellow for a beat, then fade to neutral —
+    // no lasting mark, Connections-style. Gated on the tile still being
+    // the one that was judged (word + position both match) so a quick
+    // rearrange during the flash window doesn't paint the wrong tile.
+    setFlashGuess({ order: [...order], colors });
+    setTimeout(() => setFlashGuess(null), CONFIG.FLASH_MS);
     const won = colors.every((c) => c === "green");
     track("guess_submitted", {
       puzzle_no: dayNum + 1,
@@ -1077,8 +1138,8 @@ function Commoner() {
             need this while looking at the board, not after scrolling past
             it (real feedback — see v6 note in the header comment). */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px 12px", margin: "8px 0 2px", fontSize: 10.5, color: C.faint }}>
-          <span><span style={{ ...swatch, background: C.green }} />right!</span>
-          <span><span style={{ ...swatch, background: C.yellow }} />wrong rank</span>
+          <span><span style={{ ...swatch, background: C.green }} />locked in</span>
+          <span><span style={{ ...swatch, background: C.yellow }} />flashes if wrong</span>
           <span><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} />drag to rank</span>
         </div>
 
@@ -1090,71 +1151,54 @@ function Commoner() {
               const isSel = selected === pos;
               const locked = isLocked(pos);
               const isDragged = drag && drag.moved && drag.from === pos;
-              // Record strip (v13): one small chip per PAST guess, oldest
-              // left → newest right, fixed to this RANK's column — not the
-              // tile's. Never rendered once solved (locked tile takes the
-              // whole row instead — "overwriting" the history, since it's
-              // moot). Chips stay in FIXED guess-index columns (never
-              // reshuffle as new ones append) specifically so scanning the
-              // same horizontal slot across every still-open row lets you
-              // read one whole past guess top-to-bottom.
-              const chips = locked ? [] : guesses.map((g) => puzzle.words[g.order[pos]].w);
+              // v15: flash, don't record. A wrong slot briefly turns
+              // yellow right after submit, then fades back to neutral —
+              // no lasting chip, Connections-style (see the flashGuess
+              // state + FLASH_MS). Gated on the word AND position both
+              // still matching the judged guess, so rearranging away
+              // from a flashing tile doesn't paint whatever slides in
+              // next to it.
+              const flashing = !locked && flashGuess && flashGuess.order[pos] === wordIdx && flashGuess.colors[pos] === "yellow";
+              const bg = locked ? C.green : flashing ? C.yellow : C.card;
+              const borderColor = locked ? "#2E6B44" : flashing ? "#96701E" : (isSel ? C.ink : C.line);
+              const litUp = locked || flashing;
               return (
-                <div key={puzzle.words[wordIdx].w} style={{ display: "flex", gap: 5, alignItems: "stretch" }}>
-                  <button
-                    onPointerDown={(e) => onPointerDown(e, pos)}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                    onPointerCancel={() => setDrag(null)}
-                    disabled={done}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      flex: 1, minWidth: 0,
-                      background: locked ? C.green : C.card,
-                      color: locked ? "#F4F5F0" : C.ink,
-                      border: "2px solid " + (locked ? "#2E6B44" : (isSel ? C.ink : C.line)),
-                      boxShadow: isDragged ? "4px 6px 0 rgba(32,41,31,0.3)" : isSel ? "3px 3px 0 " + C.ink : "2px 2px 0 rgba(32,41,31,0.12)",
-                      transform: isDragged
-                        ? "translateY(" + drag.delta + "px) scale(1.02)"
-                        : "translateY(" + tileShift(pos) + "px)" + (isSel ? " translate(-2px,-2px)" : ""),
-                      transition: isDragged ? "none" : "transform .15s, background .2s, border-color .2s, box-shadow .12s",
-                      zIndex: isDragged ? 10 : 1,
-                      position: "relative",
-                      touchAction: "none",
-                      userSelect: "none", WebkitUserSelect: "none",
-                      padding: "11px 14px", borderRadius: 3,
-                      fontFamily: "inherit", fontSize: 16, fontWeight: 600,
-                      letterSpacing: "1.5px", textAlign: "left",
-                      cursor: locked ? "default" : "pointer",
-                      opacity: done && !locked ? 0.95 : 1,
-                    }}
-                  >
-                    <span style={{ fontSize: 11, color: locked ? "rgba(244,245,240,.6)" : C.faint, minWidth: 14 }}>{pos + 1}</span>
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{puzzle.words[wordIdx].w}</span>
-                    {!done && (
-                      <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: isSel ? C.ink : locked ? "rgba(244,245,240,.75)" : C.line, flexShrink: 0 }}>
-                        {locked ? "✓" : isSel ? "TAP ANOTHER TO SWAP" : "⠿"}
-                      </span>
-                    )}
-                  </button>
-                  {chips.length > 0 && (
-                    <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-                      {chips.map((word, gi) => (
-                        <div key={gi} style={{
-                          width: 36, flexShrink: 0, borderRadius: 3,
-                          background: C.yellow, color: "#F4F5F0",
-                          border: "1.5px solid #96701E",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 8.5, fontWeight: 600, letterSpacing: "0.2px",
-                          overflow: "hidden", whiteSpace: "nowrap",
-                          animation: "pop .18s ease-out",
-                        }}>
-                          {word.length > 4 ? word.slice(0, 4) : word}
-                        </div>
-                      ))}
-                    </div>
+                <button
+                  key={puzzle.words[wordIdx].w}
+                  onPointerDown={(e) => onPointerDown(e, pos)}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={() => setDrag(null)}
+                  disabled={done}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    background: bg,
+                    color: litUp ? "#F4F5F0" : C.ink,
+                    border: "2px solid " + borderColor,
+                    boxShadow: isDragged ? "4px 6px 0 rgba(32,41,31,0.3)" : isSel ? "3px 3px 0 " + C.ink : "2px 2px 0 rgba(32,41,31,0.12)",
+                    transform: isDragged
+                      ? "translateY(" + drag.delta + "px) scale(1.02)"
+                      : "translateY(" + tileShift(pos) + "px)" + (isSel ? " translate(-2px,-2px)" : ""),
+                    transition: isDragged ? "none" : "transform .15s, background .5s ease-out, border-color .5s ease-out, box-shadow .12s",
+                    zIndex: isDragged ? 10 : 1,
+                    position: "relative",
+                    touchAction: "none",
+                    userSelect: "none", WebkitUserSelect: "none",
+                    padding: "11px 14px", borderRadius: 3,
+                    fontFamily: "inherit", fontSize: 16, fontWeight: 600,
+                    letterSpacing: "1.5px", textAlign: "left",
+                    cursor: locked ? "default" : "pointer",
+                    opacity: done && !locked ? 0.95 : 1,
+                  }}
+                >
+                  <span style={{ fontSize: 11, color: litUp ? "rgba(244,245,240,.6)" : C.faint, minWidth: 14 }}>{pos + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{puzzle.words[wordIdx].w}</span>
+                  {!done && (
+                    <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: isSel ? C.ink : litUp ? "rgba(244,245,240,.75)" : C.line, flexShrink: 0 }}>
+                      {locked ? "✓" : isSel ? "TAP ANOTHER TO SWAP" : "⠿"}
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -1201,6 +1245,7 @@ function Commoner() {
           onClose={() => { setShowResults(false); track("results_dismissed", { puzzle_no: dayNum + 1 }); }}
           won={status === "won"}
           guessCount={guesses.length}
+          guesses={guesses}
           words={puzzle.words}
           maxZipf={maxZipf}
           stats={stats}
@@ -1288,12 +1333,12 @@ function HowToPlay({ onClose, maxGuesses }) {
         <HowStep n="1">Rank 5 words from <b>most</b> to <b>least</b> commonly used in everyday English.</HowStep>
         <HowStep n="2">Drag a card to reorder it or tap two cards to swap them.</HowStep>
         <HowStep n="3">Submit your order. A correct rank <b>locks green</b> permanently.</HowStep>
-        <HowStep n="4">Wrong guesses appear as yellow tiles to the right so you can compare guesses.</HowStep>
-        <HowStep n="5">You get {maxGuesses} tries. All green means solved.</HowStep>
+        <HowStep n="4">A wrong rank flashes yellow for a second, then fades — no lasting mark, so pay attention.</HowStep>
+        <HowStep n="5">You get {maxGuesses} tries, and can't repeat a word in a rank you've already tried it in. All green means solved — your full guess history shows up as a color grid at the end.</HowStep>
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid " + C.line, fontSize: 12.5, lineHeight: 2 }}>
           <div><span style={{ ...swatch, background: C.green }} /><b>green</b> — correct rank, locked in</div>
-          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — a past guess - wrong rank</div>
+          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — flashes briefly on a wrong rank</div>
           <div><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} /><b>white</b> — rank not solved yet</div>
         </div>
 
@@ -1315,7 +1360,7 @@ function HowToPlay({ onClose, maxGuesses }) {
    first. "THE RECORD SHOWS" reveal is last: satisfying but least urgent.
    "BACK TO PUZZLE" lets players see their finished (all-green/locked) board
    underneath; Commoner renders a floating "VIEW RESULTS" pill to reopen. */
-function ResultsOverlay({ onClose, won, guessCount, words, maxZipf, stats, winPct, maxDist, doShare, toast }) {
+function ResultsOverlay({ onClose, won, guessCount, guesses, words, maxZipf, stats, winPct, maxDist, doShare, toast }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 90, background: "rgba(32,41,31,0.92)",
@@ -1336,6 +1381,16 @@ function ResultsOverlay({ onClose, won, guessCount, words, maxZipf, stats, winPc
 
         <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 24, textAlign: "center" }}>
           {won ? "Solved in " + guessCount : "Out of tries"}
+        </div>
+
+        {/* v15: the ONLY place the full guess history is visible anywhere
+            in the app — the board itself only ever shows a brief flash,
+            never a lasting record (see the tile render in the main
+            component). Same grid the share text uses, just rendered. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, marginTop: 14, fontSize: 22 }}>
+          {guesses.map((g, gi) => (
+            <div key={gi}>{g.colors.map((c) => EMOJI[c]).join(" ")}</div>
+          ))}
         </div>
 
         <button onClick={doShare} style={{ width: "100%", marginTop: 14, padding: "13px 0", background: C.green, color: "#fff", border: "none", borderRadius: 3, fontFamily: "inherit", fontWeight: 600, fontSize: 14, letterSpacing: "2px" }}>
