@@ -44,14 +44,20 @@
   ── THE GAME ────────────────────────────────────────────────────────────────
   One puzzle per day. Player is shown 5 words in a scrambled order and must
   rank them from MOST to LEAST commonly used in everyday English, in at most
-  4 guesses. After each guess, each card is colored by positional distance
-  from its true rank:
-      GREEN  = exactly right spot (locks)
-      YELLOW = wrong spot (any distance, one away or more)
-      WHITE  = neutral/untouched — this word hasn't been judged in this rank
-               yet (never guessed there, or moved since its last verdict)
+  3 guesses. Each rank slot is scored independently and PERMANENTLY once
+  solved (see v13 — this replaced a per-guess "positional distance" model):
+      GREEN  = this rank is solved. The draggable tile locks here forever
+               and expands to fill the row.
+      YELLOW = NEVER appears on the draggable tile itself. It only shows
+               up in a small non-moving "record" strip to the right of an
+               unsolved rank — one chip per past guess that was wrong here.
+      WHITE  = the draggable tile's only other state: not solved yet. It
+               is never colored by a guess the way it used to be — moving
+               it around never changes anything about what it displays.
   Win = all green. Share artifact is a Wordle-style emoji grid (one row per
-  guess): e.g.  "Commoner #14 — 3/4" + rows of squares emoji + URL.
+  guess): e.g.  "Commoner #14 — 3/4" + rows of squares emoji + URL — the
+  underlying per-position green/yellow scoring that builds this grid is
+  unchanged by v13; only how it's DISPLAYED live on the board changed.
   The theme of each word set exists in data but is NOT shown (blind guess 1).
 
   ── DESIGN HISTORY / WHY IT IS THE WAY IT IS (hard-won, don't regress) ──────
@@ -170,7 +176,7 @@
     saved games store word INDICES (see commoner.state), so editing an
     already-live set would corrupt in-progress/finished boards for anyone
     who played it; only ever edit a set before its date is reached.
-  * v12 (CURRENT, second rebrand — WordRank → Commoner): renamed the game,
+  * v12 (second rebrand — WordRank → Commoner): renamed the game,
     NOT the game's mechanics/data/analytics. In scope: page title, header
     wordmark (CONFIG.GAME_NAME), meta/OG/Twitter tags + og-image.png
     (regenerated with the new wordmark), share text, HowToPlay copy,
@@ -189,9 +195,42 @@
     word-rank/ never had real players on it, so its redirect skips
     mentioning the brief WordRank era and goes straight "WordRank →
     Commoner," same shape as the original parlance/ -> word-rank/ stub.
-  * Feedback color persistence rule: a card wears its verdict color ONLY
-    while it remains in the position it was judged in; moving it reverts it
-    to neutral (verdicts are about positions, not words). Self-teaching.
+  * v13 (CURRENT, board mechanic redesign — real playtest feedback): the
+    OLD "feedback color persistence rule" below (kept for history, but no
+    longer how the game behaves) had a tile wear its verdict color ONLY
+    while it sat in the exact spot it was judged in — drag it away and the
+    color silently reverted to neutral. Reported confusion: the color
+    LOOKED like it belonged to the tile, so it flickering on/off during
+    ordinary rearranging read as broken, not as "the verdict is about the
+    rank, not the tile" (which was the intent). Fix: split every rank row
+    into two zones. LEFT = the draggable tile, which is now ALWAYS neutral
+    (white) until that rank is solved — never yellow, ever, no matter what
+    you drag into it. RIGHT = a small per-rank "record" strip that does
+    NOT move: one small yellow chip per past guess that was wrong at this
+    rank, holding the (truncated) word that was there, oldest → newest,
+    left → right. Chips are assigned FIXED columns by guess index (guess 1
+    always the leftmost chip, guess 2 next, etc.) and NEVER reshuffle as
+    new ones append — deliberately, so that scanning the same horizontal
+    slot down every still-open row reconstructs one entire past guess,
+    top to bottom. (A stacked/vertical layout was considered and rejected
+    for exactly this reason — it breaks that cross-row read.) The moment a
+    rank goes green, its tile locks AND expands to fill the whole row,
+    discarding that row's chip history — "overwriting" it, since a solved
+    rank has nothing left to compare. This fully replaces the OLD
+    below-the-board "RECORD" block (a separate grid of full past
+    arrangements) rather than duplicating the same information twice; the
+    per-rank strips carry strictly more at-a-glance value in less space.
+    Freed-up room, plus MAX_GUESSES 4→3 (also this pass, same reasoning:
+    more real estate, and a tighter guess budget matches the new
+    at-a-glance record making deduction faster), is what makes the inline
+    record strips fit without pushing the board below the fold — see the
+    v6 mobile-fit note; the same "verify on a real small viewport, don't
+    eyeball a desktop window" rule applies to this layout too.
+  * SUPERSEDED BY v13 — kept for history, not current behavior: a card
+    used to wear its verdict color ONLY while it remained in the position
+    it was judged in; moving it reverted it to neutral (verdicts were
+    about positions, not words). Self-teaching in theory; confusing during
+    ordinary reordering in practice — see v13.
   * v3.1 (playtest, day 1): rules were a one-time intro line that vanished
     on first interaction — a real player forgot gold-vs-red mid-game and
     resubmitted their guess-1 arrangement as guess 4 (X/4). Rules + color
@@ -242,6 +281,18 @@
   number is real — ordinary polysemy that doesn't change the obvious
   meaning is fine too. Verify every set against wordfreq before shipping
   it; the corpus is the referee, even when it contradicts intuition.
+  Since v13, ALSO check every set's record-chip truncation (see
+  `word.slice(0, 4)` in the board render): no two words in the SAME set
+  may share the same first-4-letter prefix, or their yellow chips become
+  indistinguishable (a false "collision" — the board would look like it's
+  showing the same word twice). Checked by hand across all 30 current sets
+  (2026-07-19, post-v13) — zero exact 4-letter collisions and zero
+  first-3-letter near-collisions anywhere in the bank, and every word from
+  the 3-letter shortest (OWL) to the 14-letter longest (PALEONTOLOGIST)
+  renders cleanly in the fixed-width chip. This is NOT enforced by code —
+  it's a hand-verification step, so re-run it (or write a quick script:
+  group each set's words by their first 4 letters, flag any group with
+  >1 word) whenever new sets are added.
 
   ── ROADMAP / OPEN THREADS ──────────────────────────────────────────────────
   * PUZZLES has 30 verified sets (see v9) — the list repeats starting
@@ -351,7 +402,7 @@ const { useState, useMemo, useRef, useEffect } = React;
 /* ================= CONFIG — the tuning knobs ================= */
 const CONFIG = {
   GAME_NAME: "Commoner",
-  MAX_GUESSES: 4,
+  MAX_GUESSES: 3,
   SHOW_THEME: false,          // blind guess 1 (themes exist in data)
   EPOCH: "2026-07-15",        // day of puzzle #1 (local midnight boundary)
   SHARE_URL: "https://timd73.github.io/commoner/",
@@ -734,14 +785,19 @@ function Commoner() {
   const [drag, setDrag] = useState(null); // {from, startY, delta, moved}
 
   const done = status !== "playing";
-  const lastGuess = guesses[guesses.length - 1];
 
-  // A tile wears its verdict only while it still sits in the judged position.
-  const tileVerdict = (pos) => {
-    if (!lastGuess) return null;
-    if (lastGuess.order[pos] !== order[pos]) return null;
-    return lastGuess.colors[pos];
-  };
+  /* ---------- v13: solved-forever positions, not "last guess" verdicts ----------
+     A rank is SOLVED once ANY past guess landed green there — permanent,
+     not tied to the tile's current position. This replaces the old
+     tileVerdict() model, which colored a tile yellow/green only while it
+     sat in the exact spot it was judged in, and silently reverted to
+     neutral the moment you dragged it away. That looked like a bug: the
+     verdict is a fact about the RANK, not the tile, so it shouldn't
+     flicker based on what you do with the tile afterward. Now the
+     draggable tile is ALWAYS neutral until solved (green, permanently) —
+     see the board render below for where the wrong-guess history actually
+     lives instead (a small per-rank record strip that never moves). */
+  const solvedAt = (pos) => guesses.some((g) => g.colors[pos] === "green");
 
   /* ---------- green locks (playtest v3.2) ----------
      Green = confirmed correct position, so green cards are PINNED: they
@@ -749,7 +805,7 @@ function Commoner() {
      them. A tester moved a green card (the interaction allowed it), saw it
      lose its green, and reasonably concluded the game was broken. If the
      feedback is a fact, the board should enforce it. */
-  const isLocked = (pos) => tileVerdict(pos) === "green";
+  const isLocked = (pos) => solvedAt(pos);
   const unlockedPositions = order.map((_, p) => p).filter((p) => !isLocked(p));
 
   // Reorder ONLY the unlocked cards: dragged card leaves its slot, is
@@ -946,7 +1002,12 @@ function Commoner() {
         {/* header — kept compact on purpose: header + key + 5 tiles + submit
             must all fit above the fold on a small phone (see v6 note) */}
         <header style={{ textAlign: "center", padding: "12px 0 6px", borderBottom: "2px solid " + C.ink }}>
-          <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 28, letterSpacing: "-0.5px", lineHeight: 1 }}>
+          {/* the pun the whole rebrand is named for: "commoner" as in
+              common WORDS, but read first as the opposite of royalty */}
+          <div style={{ fontSize: 12, color: C.faint, fontStyle: "italic", lineHeight: 1.3, padding: "0 20px" }}>
+            Are you word-frequency royalty, or a simple
+          </div>
+          <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 28, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
             {CONFIG.GAME_NAME}
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 4, fontSize: 10.5, color: C.faint, letterSpacing: "1.5px" }}>
@@ -966,9 +1027,9 @@ function Commoner() {
             need this while looking at the board, not after scrolling past
             it (real feedback — see v6 note in the header comment). */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px 12px", margin: "8px 0 2px", fontSize: 10.5, color: C.faint }}>
-          <span><span style={{ ...swatch, background: C.green }} />exact</span>
-          <span><span style={{ ...swatch, background: C.yellow }} />wrong spot</span>
-          <span><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} />unguessed</span>
+          <span><span style={{ ...swatch, background: C.green }} />locked in</span>
+          <span><span style={{ ...swatch, background: C.yellow }} />tried here, wrong</span>
+          <span><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} />not solved yet</span>
         </div>
 
         {/* board */}
@@ -977,50 +1038,73 @@ function Commoner() {
           <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 6, margin: "5px 0" }}>
             {order.map((wordIdx, pos) => {
               const isSel = selected === pos;
-              const verdict = tileVerdict(pos);
               const locked = isLocked(pos);
               const isDragged = drag && drag.moved && drag.from === pos;
-              const v = verdict ? VERDICT[verdict] : null;
-              const bg = v ? v.bg : C.card;
-              const fg = verdict ? "#F4F5F0" : C.ink;
-              const numFg = verdict ? "rgba(244,245,240,.6)" : C.faint;
-              const border = v ? v.border : isSel ? C.ink : C.line;
+              // Record strip (v13): one small chip per PAST guess, oldest
+              // left → newest right, fixed to this RANK's column — not the
+              // tile's. Never rendered once solved (locked tile takes the
+              // whole row instead — "overwriting" the history, since it's
+              // moot). Chips stay in FIXED guess-index columns (never
+              // reshuffle as new ones append) specifically so scanning the
+              // same horizontal slot across every still-open row lets you
+              // read one whole past guess top-to-bottom.
+              const chips = locked ? [] : guesses.map((g) => puzzle.words[g.order[pos]].w);
               return (
-                <button
-                  key={puzzle.words[wordIdx].w}
-                  onPointerDown={(e) => onPointerDown(e, pos)}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={() => setDrag(null)}
-                  disabled={done}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    background: bg, color: fg,
-                    border: "2px solid " + border,
-                    boxShadow: isDragged ? "4px 6px 0 rgba(32,41,31,0.3)" : isSel ? "3px 3px 0 " + C.ink : "2px 2px 0 rgba(32,41,31,0.12)",
-                    transform: isDragged
-                      ? "translateY(" + drag.delta + "px) scale(1.02)"
-                      : "translateY(" + tileShift(pos) + "px)" + (isSel ? " translate(-2px,-2px)" : ""),
-                    transition: isDragged ? "none" : "transform .15s, background .2s, border-color .2s, box-shadow .12s",
-                    zIndex: isDragged ? 10 : 1,
-                    position: "relative",
-                    touchAction: "none",
-                    userSelect: "none", WebkitUserSelect: "none",
-                    padding: "11px 14px", borderRadius: 3,
-                    fontFamily: "inherit", fontSize: 16, fontWeight: 600,
-                    letterSpacing: "1.5px", textAlign: "left",
-                    cursor: locked ? "default" : "pointer",
-                    opacity: done && !verdict ? 0.95 : 1,
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: numFg, minWidth: 14 }}>{pos + 1}</span>
-                  <span style={{ flex: 1 }}>{puzzle.words[wordIdx].w}</span>
-                  {!done && (
-                    <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: isSel ? C.ink : verdict ? "rgba(244,245,240,.75)" : C.line }}>
-                      {locked ? "✓" : isSel ? "TAP ANOTHER TO SWAP" : "⠿"}
-                    </span>
+                <div key={puzzle.words[wordIdx].w} style={{ display: "flex", gap: 5, alignItems: "stretch" }}>
+                  <button
+                    onPointerDown={(e) => onPointerDown(e, pos)}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
+                    onPointerCancel={() => setDrag(null)}
+                    disabled={done}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      flex: 1, minWidth: 0,
+                      background: locked ? C.green : C.card,
+                      color: locked ? "#F4F5F0" : C.ink,
+                      border: "2px solid " + (locked ? "#2E6B44" : (isSel ? C.ink : C.line)),
+                      boxShadow: isDragged ? "4px 6px 0 rgba(32,41,31,0.3)" : isSel ? "3px 3px 0 " + C.ink : "2px 2px 0 rgba(32,41,31,0.12)",
+                      transform: isDragged
+                        ? "translateY(" + drag.delta + "px) scale(1.02)"
+                        : "translateY(" + tileShift(pos) + "px)" + (isSel ? " translate(-2px,-2px)" : ""),
+                      transition: isDragged ? "none" : "transform .15s, background .2s, border-color .2s, box-shadow .12s",
+                      zIndex: isDragged ? 10 : 1,
+                      position: "relative",
+                      touchAction: "none",
+                      userSelect: "none", WebkitUserSelect: "none",
+                      padding: "11px 14px", borderRadius: 3,
+                      fontFamily: "inherit", fontSize: 16, fontWeight: 600,
+                      letterSpacing: "1.5px", textAlign: "left",
+                      cursor: locked ? "default" : "pointer",
+                      opacity: done && !locked ? 0.95 : 1,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: locked ? "rgba(244,245,240,.6)" : C.faint, minWidth: 14 }}>{pos + 1}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{puzzle.words[wordIdx].w}</span>
+                    {!done && (
+                      <span style={{ fontSize: locked ? 10 : 12, letterSpacing: locked ? "1px" : "normal", color: isSel ? C.ink : locked ? "rgba(244,245,240,.75)" : C.line, flexShrink: 0 }}>
+                        {locked ? "✓" : isSel ? "TAP ANOTHER TO SWAP" : "⠿"}
+                      </span>
+                    )}
+                  </button>
+                  {chips.length > 0 && (
+                    <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                      {chips.map((word, gi) => (
+                        <div key={gi} style={{
+                          width: 36, flexShrink: 0, borderRadius: 3,
+                          background: C.yellow, color: "#F4F5F0",
+                          border: "1.5px solid #96701E",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 8.5, fontWeight: 600, letterSpacing: "0.2px",
+                          overflow: "hidden", whiteSpace: "nowrap",
+                          animation: "pop .18s ease-out",
+                        }}>
+                          {word.length > 4 ? word.slice(0, 4) : word}
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -1043,30 +1127,6 @@ function Commoner() {
           </button>
         )}
 
-        {/* guess record — shows arrangements, not just colors, to enable deduction */}
-        {guesses.length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, letterSpacing: "2px", color: C.faint, marginBottom: 6 }}>RECORD</div>
-            {guesses.map((g, gi) => (
-              <div key={gi} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: C.faint, width: 12 }}>{gi + 1}</span>
-                {g.colors.map((c, i) => (
-                  <div key={i} style={{
-                    flex: 1, height: 24, background: VERDICT[c].bg, borderRadius: 2,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "rgba(248,248,242,.92)", fontSize: 9, fontWeight: 600,
-                    letterSpacing: "0.5px", overflow: "hidden", whiteSpace: "nowrap",
-                    animation: "pop .18s ease-out",
-                  }}>
-                    {puzzle.words[g.order[i]].w.length > 7
-                      ? puzzle.words[g.order[i]].w.slice(0, 6) + "…"
-                      : puzzle.words[g.order[i]].w}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
 
         <footer style={{ textAlign: "center", fontSize: 9, color: C.faint, letterSpacing: "1px", marginTop: 20 }}>
           <div>FREQUENCY DATA: VERIFIED VIA WORDFREQ (ENGLISH CORPUS)</div>
@@ -1177,13 +1237,14 @@ function HowToPlay({ onClose, maxGuesses }) {
 
         <HowStep n="1">Rank 5 words from <b>most</b> to <b>least</b> commonly used in everyday English.</HowStep>
         <HowStep n="2">Drag a card to reorder it, or tap two cards to swap them.</HowStep>
-        <HowStep n="3">Submit your order — each card is scored by how close it lands to its true rank.</HowStep>
-        <HowStep n="4">You get {maxGuesses} tries. All green means solved.</HowStep>
+        <HowStep n="3">Submit your order. A correct rank <b>locks green</b>, permanently.</HowStep>
+        <HowStep n="4">Wrong guesses show up as small yellow tiles next to that rank — they stay put even as you keep rearranging, so you can compare guesses side by side.</HowStep>
+        <HowStep n="5">You get {maxGuesses} tries. All green means solved.</HowStep>
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid " + C.line, fontSize: 12.5, lineHeight: 2 }}>
-          <div><span style={{ ...swatch, background: C.green }} /><b>green</b> — right spot, locks in place</div>
-          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — wrong spot</div>
-          <div><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} /><b>white</b> — not guessed in this rank yet</div>
+          <div><span style={{ ...swatch, background: C.green }} /><b>green</b> — correct rank, locked in</div>
+          <div><span style={{ ...swatch, background: C.yellow }} /><b>yellow</b> — a past guess that was wrong here</div>
+          <div><span style={{ ...swatch, background: C.card, border: "1.5px solid " + C.line }} /><b>white</b> — this rank isn't solved yet</div>
         </div>
 
         <button onClick={onClose} style={{
