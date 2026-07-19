@@ -88,7 +88,7 @@
     button pinned top-right reopens the same primer any time — it does NOT
     reset seenIntro; it's just a manual re-trigger, so this is not "did
     they finish onboarding" state, only "have they seen it once unprompted."
-  * v6 (CURRENT, mobile pass): real playtest on a 3-year-old iPhone found
+  * v6 (mobile pass): real playtest on a 3-year-old iPhone found
     two problems. (1) The color key lived in the footer, below the board —
     on a short phone it scrolled out of view during actual play, exactly
     when it's needed. Moved to a compact one-line version ABOVE the board,
@@ -111,7 +111,7 @@
     for "temporarily-dismissed overlay you can bring back."
   * v7: added GA4 analytics (see the ANALYTICS section below for the full
     event list).
-  * v8 (CURRENT, prime-time cleanup): shipped for real, so the dev panel
+  * v8 (prime-time cleanup): shipped for real, so the dev panel
     (tap "No. X" → prev/next/reset/theme-toggle to roam the whole PUZZLES
     list) is GONE — it was a playtesting tool, and leaving a hidden menu
     reachable by tapping the puzzle number is exactly the kind of thing a
@@ -124,7 +124,7 @@
     dead-code `if (true)`s). Also added a "PROBLEMS OR FEEDBACK?" link in
     the footer (Google Form) with its own `feedback_link_clicked` event —
     see FEEDBACK_URL in CONFIG to change the destination.
-  * v9 (CURRENT): expanded PUZZLES from 12 to 30 (indices 0-29) and ran
+  * v9: expanded PUZZLES from 12 to 30 (indices 0-29) and ran
     EVERY set — the original 12 included — through the wordfreq pipeline;
     none are hand-estimated placeholders anymore (several of the original
     12 had the WRONG order once checked against real data — e.g. "Around
@@ -145,7 +145,7 @@
     (SOAP/soap opera, GHOST/ghosting, THOR-the-myth/THOR-the-movie) was
     left alone — the bar is "different enough sense that a player would
     feel cheated," not "has any other meaning at all."
-  * v10 (CURRENT, launch-readiness pass from external playtest feedback):
+  * v10 (launch-readiness pass from external playtest feedback):
     - SHARE_URL was a bare "domain/path" string — some share targets won't
       auto-link text without a scheme. Now a full "https://…/" URL, and
       the share text got a one-line tagline (SHARE_TAGLINE) between the
@@ -195,7 +195,43 @@
     word-rank/ never had real players on it, so its redirect skips
     mentioning the brief WordRank era and goes straight "WordRank →
     Commoner," same shape as the original parlance/ -> word-rank/ stub.
-  * v13 (CURRENT, board mechanic redesign — real playtest feedback): the
+  * v14 (CURRENT, retention-driven resequencing, 2026-07-19): the theory —
+    a rough early puzzle can suppress next-day return for a big cohort of
+    newcomers, and puzzle #2 ("Around the sink," 2026-07-16, this cohort's
+    first full day) had three adjacent 0.07-0.08 gaps, essentially a coin
+    flip. Only single-digit signups involved so far, so this is a
+    precaution against a plausible mechanism, not a confirmed cause — but
+    it's cheap to fix going forward and puzzle #2 itself is UNTOUCHED
+    (already played; saved games key off word indices, so editing a live
+    or past set corrupts finished boards — see v11's same reasoning).
+    Two more things worth naming precisely: (1) at the time this fix
+    shipped, puzzle #5 (2026-07-19, "Weather report," HAIL/FOG at a 0.02
+    gap) was THAT DAY's live puzzle and genuinely too late to touch — a
+    non-issue in practice, because v11 (a few days earlier) had already
+    swapped FOG for BLIZZARD pre-emptively, so the live #5 was never
+    actually the coin-flip version. (2) puzzle #8 ("The band,"
+    TUBA/MANDOLIN at 0.06) was likewise already fixed by v11 (MANDOLIN →
+    CYMBAL) before this pass. Recorded here because both were re-flagged
+    by a review that was working from stale information — worth a sanity
+    check against the ACTUAL current file before acting on any "this
+    puzzle is broken" claim, this doc block included.
+    What DID need fixing, found by re-auditing the full bank for any
+    upcoming (not-yet-played) set with min gap < 0.15: "Parts of a house"
+    (ATTIC/CELLAR, 0.03), "Trades" (PLUMBER/BLACKSMITH, 0.10), and
+    "Punctuation" (APOSTROPHE/PARENTHESIS, 0.13) — each fixed with a
+    single word swap, re-verified via the wordfreq pipeline (see each
+    set's own inline comment for the specific before/after gaps). Beyond
+    those three repairs, RESEQUENCED puzzles #6-30 (2026-07-20 onward;
+    #1-5 untouched, past or live) so difficulty reads as a gradient, not a
+    lottery: the first week back (#6-12) uses the highest-min-gap sets in
+    the whole bank (0.28-0.47) to rebuild confidence, weeks 2-3 ease
+    downward through the 0.22-0.27 band, and the tightest-but-now-safe
+    sets (0.18-0.21, still comfortably above the 0.15 floor post-fix) land
+    last (#27-30), on the theory that by then the habit is established
+    and difficulty can be a feature again rather than a first impression.
+    THEME/WORD CONTENT for all untouched sets is byte-identical to before
+    — only the ORDER of sets #6-30 and the three swapped words changed.
+  * v13 (board mechanic redesign — real playtest feedback): the
     OLD "feedback color persistence rule" below (kept for history, but no
     longer how the game behaves) had a tile wear its verdict color ONLY
     while it sat in the exact spot it was judged in — drag it away and the
@@ -454,12 +490,48 @@ const PUZZLES = [
     { w: "DRIZZLE",    zipf: 3.15 },
     { w: "SLEET",      zipf: 2.83 },
   ]},
-  { theme: "Creatures", words: [
-    { w: "RABBIT",     zipf: 4.05 },
-    { w: "OWL",        zipf: 3.87 },
-    { w: "DONKEY",     zipf: 3.62 },
-    { w: "OTTER",      zipf: 3.37 },
-    { w: "WOMBAT",     zipf: 2.58 },
+  // ── v14 resequencing starts here (idx 5-29 / puzzles #6-30) ──────────
+  // See the v14 changelog entry for the full rationale: the first week
+  // back skews toward the highest min-gaps in the bank (rebuilding
+  // confidence right after puzzle #2's rocky 0.07 gaps), difficulty eases
+  // in gradually across weeks 2-3, and the tightest-but-still-safe sets
+  // (all now >= 0.18 after the word swaps below) land last, once the
+  // habit is established. Themes/word CONTENT is unchanged from before
+  // except the three explicitly-marked swaps.
+  { theme: "Wardrobe", words: [
+    { w: "JACKET",     zipf: 4.32 },
+    { w: "SCARF",      zipf: 3.68 },
+    { w: "CARDIGAN",   zipf: 3.21 },
+    { w: "MITTEN",     zipf: 2.48 },
+    { w: "GALOSHES",   zipf: 1.81 },
+  ]},
+  { theme: "Pirate life", words: [
+    { w: "TREASURE",   zipf: 4.17 },
+    { w: "PARROT",     zipf: 3.49 },
+    { w: "SCHOONER",   zipf: 3.03 },
+    { w: "GALLEON",    zipf: 2.57 },
+    { w: "DOUBLOON",   zipf: 1.68 },
+  ]},
+  { theme: "Traffic", words: [
+    { w: "TRAFFIC",       zipf: 4.85 },
+    { w: "HIGHWAY",       zipf: 4.49 },
+    { w: "INTERSECTION",  zipf: 3.88 },
+    { w: "ROUNDABOUT",    zipf: 3.33 },
+    { w: "CROSSWALK",     zipf: 2.63 },
+  ]},
+  { theme: "Breakfast table", words: [
+    { w: "BUTTER",     zipf: 4.40 },
+    { w: "TOAST",      zipf: 3.96 },
+    { w: "YOGURT",     zipf: 3.63 },
+    { w: "WAFFLE",     zipf: 3.30 },
+    { w: "MARMALADE",  zipf: 2.89 },
+  ]},
+  { theme: "Norse myth", words: [
+    { w: "THOR",       zipf: 3.69 },
+    { w: "LOKI",       zipf: 3.27 },
+    { w: "RAGNAROK",   zipf: 2.64 },
+    { w: "YGGDRASIL",  zipf: 2.31 },
+    { w: "LONGSHIP",   zipf: 1.56 },
   ]},
   { theme: "Kitchen drawer", words: [
     { w: "SPOON",      zipf: 3.88 },
@@ -467,6 +539,41 @@ const PUZZLES = [
     { w: "WHISK",      zipf: 3.11 },
     { w: "LADLE",      zipf: 2.66 },
     { w: "COLANDER",   zipf: 2.37 },
+  ]},
+  { theme: "Spooky season", words: [
+    { w: "GHOST",        zipf: 4.42 },
+    { w: "CEMETERY",     zipf: 4.06 },
+    { w: "PHANTOM",      zipf: 3.78 },
+    { w: "WEREWOLF",     zipf: 3.33 },
+    { w: "POLTERGEIST",  zipf: 2.57 },
+  ]},
+  { theme: "Desserts", words: [
+    { w: "PUDDING",    zipf: 3.61 },
+    { w: "FUDGE",      zipf: 3.33 },
+    { w: "TRUFFLE",    zipf: 3.06 },
+    { w: "MERINGUE",   zipf: 2.79 },
+    { w: "TIRAMISU",   zipf: 2.46 },
+  ]},
+  { theme: "Wizardry", words: [
+    { w: "WIZARD",       zipf: 3.93 },
+    { w: "POTION",       zipf: 3.32 },
+    { w: "CAULDRON",     zipf: 3.06 },
+    { w: "INCANTATION",  zipf: 2.56 },
+    { w: "SPELLBOOK",    zipf: 1.74 },
+  ]},
+  { theme: "Insects", words: [
+    { w: "ANT",          zipf: 3.86 },
+    { w: "CATERPILLAR",  zipf: 3.38 },
+    { w: "MANTIS",       zipf: 3.11 },
+    { w: "LADYBUG",      zipf: 2.67 },
+    { w: "EARWIG",       zipf: 2.07 },
+  ]},
+  { theme: "Zoo animals", words: [
+    { w: "ELEPHANT",   zipf: 4.08 },
+    { w: "PANDA",      zipf: 3.65 },
+    { w: "GIRAFFE",    zipf: 3.32 },
+    { w: "FLAMINGO",   zipf: 3.06 },
+    { w: "MEERKAT",    zipf: 2.49 },
   ]},
   { theme: "The band", words: [
     // v11: MANDOLIN swapped for CYMBAL — TUBA/MANDOLIN was a 0.06 gap.
@@ -477,19 +584,12 @@ const PUZZLES = [
     { w: "TUBA",       zipf: 2.84 },
     { w: "CYMBAL",     zipf: 2.59 },
   ]},
-  { theme: "Wardrobe", words: [
-    { w: "JACKET",     zipf: 4.32 },
-    { w: "SCARF",      zipf: 3.68 },
-    { w: "CARDIGAN",   zipf: 3.21 },
-    { w: "MITTEN",     zipf: 2.48 },
-    { w: "GALOSHES",   zipf: 1.81 },
-  ]},
-  { theme: "Parts of a house", words: [
-    { w: "GARAGE",     zipf: 4.25 },
-    { w: "PORCH",      zipf: 3.85 },
-    { w: "ATTIC",      zipf: 3.63 },
-    { w: "CELLAR",     zipf: 3.60 },
-    { w: "VERANDA",    zipf: 2.89 },
+  { theme: "Night sky", words: [
+    { w: "MOON",       zipf: 4.70 },
+    { w: "SATELLITE",  zipf: 4.33 },
+    { w: "ECLIPSE",    zipf: 3.81 },
+    { w: "METEOR",     zipf: 3.55 },
+    { w: "NEBULA",     zipf: 3.23 },
   ]},
   { theme: "Landscape", words: [
     { w: "VALLEY",     zipf: 4.72 },
@@ -498,26 +598,19 @@ const PUZZLES = [
     { w: "MEADOW",     zipf: 3.60 },
     { w: "RAVINE",     zipf: 3.15 },
   ]},
-  { theme: "Trades", words: [
-    { w: "PILOT",      zipf: 4.52 },
-    { w: "BUTCHER",    zipf: 3.75 },
-    { w: "PLUMBER",    zipf: 3.36 },
-    { w: "BLACKSMITH", zipf: 3.26 },
-    { w: "COBBLER",    zipf: 2.82 },
-  ]},
-  { theme: "Breakfast table", words: [
-    { w: "BUTTER",     zipf: 4.40 },
-    { w: "TOAST",      zipf: 3.96 },
-    { w: "YOGURT",     zipf: 3.63 },
-    { w: "WAFFLE",     zipf: 3.30 },
-    { w: "MARMALADE",  zipf: 2.89 },
-  ]},
   { theme: "Office life", words: [
     { w: "DEADLINE",     zipf: 4.12 },
     { w: "SPREADSHEET",  zipf: 3.31 },
     { w: "CUBICLE",      zipf: 3.07 },
     { w: "LANYARD",      zipf: 2.65 },
     { w: "PAPERCLIP",    zipf: 2.32 },
+  ]},
+  { theme: "Deep sea", words: [
+    { w: "SHARK",      zipf: 4.10 },
+    { w: "SUBMARINE",  zipf: 3.81 },
+    { w: "OCTOPUS",    zipf: 3.46 },
+    { w: "LEVIATHAN",  zipf: 3.09 },
+    { w: "KRAKEN",     zipf: 2.85 },
   ]},
   { theme: "Superstition", words: [
     { w: "LUCK",       zipf: 4.91 },
@@ -526,26 +619,37 @@ const PUZZLES = [
     { w: "HEX",        zipf: 3.31 },
     { w: "TALISMAN",   zipf: 3.06 },
   ]},
-  { theme: "Desserts", words: [
-    { w: "PUDDING",    zipf: 3.61 },
-    { w: "FUDGE",      zipf: 3.33 },
-    { w: "TRUFFLE",    zipf: 3.06 },
-    { w: "MERINGUE",   zipf: 2.79 },
-    { w: "TIRAMISU",   zipf: 2.46 },
+  { theme: "Myth and monsters", words: [
+    { w: "GRIFFIN",    zipf: 3.90 },
+    { w: "UNICORN",    zipf: 3.54 },
+    { w: "HYDRA",      zipf: 3.31 },
+    { w: "BANSHEE",    zipf: 2.81 },
+    { w: "BASILISK",   zipf: 2.42 },
   ]},
-  { theme: "Insects", words: [
-    { w: "ANT",          zipf: 3.86 },
-    { w: "CATERPILLAR",  zipf: 3.38 },
-    { w: "MANTIS",       zipf: 3.11 },
-    { w: "LADYBUG",      zipf: 2.67 },
-    { w: "EARWIG",       zipf: 2.07 },
+  { theme: "Parts of a house", words: [
+    // v14: CELLAR swapped for PANTRY — ATTIC/CELLAR was a 0.03 gap.
+    // Gaps now 0.40/0.22/0.40/0.34.
+    { w: "GARAGE",     zipf: 4.25 },
+    { w: "PORCH",      zipf: 3.85 },
+    { w: "ATTIC",      zipf: 3.63 },
+    { w: "PANTRY",     zipf: 3.23 },
+    { w: "VERANDA",    zipf: 2.89 },
   ]},
-  { theme: "Night sky", words: [
-    { w: "MOON",       zipf: 4.70 },
-    { w: "SATELLITE",  zipf: 4.33 },
-    { w: "ECLIPSE",    zipf: 3.81 },
-    { w: "METEOR",     zipf: 3.55 },
-    { w: "NEBULA",     zipf: 3.23 },
+  { theme: "Dinosaurs", words: [
+    { w: "FOSSIL",           zipf: 3.99 },
+    { w: "DINOSAUR",         zipf: 3.77 },
+    { w: "EXCAVATION",       zipf: 3.46 },
+    { w: "PALEONTOLOGIST",   zipf: 2.52 },
+    { w: "STEGOSAURUS",      zipf: 2.12 },
+  ]},
+  { theme: "Punctuation", words: [
+    // v14: PARENTHESIS swapped for TILDE — APOSTROPHE/PARENTHESIS was a
+    // 0.13 gap. Gaps now 0.22/0.29/0.33/0.24.
+    { w: "COMMA",        zipf: 3.27 },
+    { w: "ASTERISK",     zipf: 3.05 },
+    { w: "APOSTROPHE",   zipf: 2.76 },
+    { w: "ELLIPSIS",     zipf: 2.43 },
+    { w: "TILDE",        zipf: 2.19 },
   ]},
   { theme: "School supplies", words: [
     { w: "PENCIL",       zipf: 3.95 },
@@ -561,75 +665,21 @@ const PUZZLES = [
     { w: "EUCHRE",     zipf: 1.86 },
     { w: "PINOCHLE",   zipf: 1.67 },
   ]},
-  { theme: "Punctuation", words: [
-    { w: "COMMA",        zipf: 3.27 },
-    { w: "ASTERISK",     zipf: 3.05 },
-    { w: "APOSTROPHE",   zipf: 2.76 },
-    { w: "PARENTHESIS",  zipf: 2.63 },
-    { w: "ELLIPSIS",     zipf: 2.43 },
+  { theme: "Trades", words: [
+    // v14: BLACKSMITH swapped for FLORIST — PLUMBER/BLACKSMITH was a 0.10
+    // gap. Gaps now 0.77/0.39/0.35/0.19.
+    { w: "PILOT",      zipf: 4.52 },
+    { w: "BUTCHER",    zipf: 3.75 },
+    { w: "PLUMBER",    zipf: 3.36 },
+    { w: "FLORIST",    zipf: 3.01 },
+    { w: "COBBLER",    zipf: 2.82 },
   ]},
-  { theme: "Traffic", words: [
-    { w: "TRAFFIC",       zipf: 4.85 },
-    { w: "HIGHWAY",       zipf: 4.49 },
-    { w: "INTERSECTION",  zipf: 3.88 },
-    { w: "ROUNDABOUT",    zipf: 3.33 },
-    { w: "CROSSWALK",     zipf: 2.63 },
-  ]},
-  { theme: "Zoo animals", words: [
-    { w: "ELEPHANT",   zipf: 4.08 },
-    { w: "PANDA",      zipf: 3.65 },
-    { w: "GIRAFFE",    zipf: 3.32 },
-    { w: "FLAMINGO",   zipf: 3.06 },
-    { w: "MEERKAT",    zipf: 2.49 },
-  ]},
-  { theme: "Spooky season", words: [
-    { w: "GHOST",        zipf: 4.42 },
-    { w: "CEMETERY",     zipf: 4.06 },
-    { w: "PHANTOM",      zipf: 3.78 },
-    { w: "WEREWOLF",     zipf: 3.33 },
-    { w: "POLTERGEIST",  zipf: 2.57 },
-  ]},
-  { theme: "Pirate life", words: [
-    { w: "TREASURE",   zipf: 4.17 },
-    { w: "PARROT",     zipf: 3.49 },
-    { w: "SCHOONER",   zipf: 3.03 },
-    { w: "GALLEON",    zipf: 2.57 },
-    { w: "DOUBLOON",   zipf: 1.68 },
-  ]},
-  { theme: "Norse myth", words: [
-    { w: "THOR",       zipf: 3.69 },
-    { w: "LOKI",       zipf: 3.27 },
-    { w: "RAGNAROK",   zipf: 2.64 },
-    { w: "YGGDRASIL",  zipf: 2.31 },
-    { w: "LONGSHIP",   zipf: 1.56 },
-  ]},
-  { theme: "Myth and monsters", words: [
-    { w: "GRIFFIN",    zipf: 3.90 },
-    { w: "UNICORN",    zipf: 3.54 },
-    { w: "HYDRA",      zipf: 3.31 },
-    { w: "BANSHEE",    zipf: 2.81 },
-    { w: "BASILISK",   zipf: 2.42 },
-  ]},
-  { theme: "Wizardry", words: [
-    { w: "WIZARD",       zipf: 3.93 },
-    { w: "POTION",       zipf: 3.32 },
-    { w: "CAULDRON",     zipf: 3.06 },
-    { w: "INCANTATION",  zipf: 2.56 },
-    { w: "SPELLBOOK",    zipf: 1.74 },
-  ]},
-  { theme: "Deep sea", words: [
-    { w: "SHARK",      zipf: 4.10 },
-    { w: "SUBMARINE",  zipf: 3.81 },
-    { w: "OCTOPUS",    zipf: 3.46 },
-    { w: "LEVIATHAN",  zipf: 3.09 },
-    { w: "KRAKEN",     zipf: 2.85 },
-  ]},
-  { theme: "Dinosaurs", words: [
-    { w: "FOSSIL",           zipf: 3.99 },
-    { w: "DINOSAUR",         zipf: 3.77 },
-    { w: "EXCAVATION",       zipf: 3.46 },
-    { w: "PALEONTOLOGIST",   zipf: 2.52 },
-    { w: "STEGOSAURUS",      zipf: 2.12 },
+  { theme: "Creatures", words: [
+    { w: "RABBIT",     zipf: 4.05 },
+    { w: "OWL",        zipf: 3.87 },
+    { w: "DONKEY",     zipf: 3.62 },
+    { w: "OTTER",      zipf: 3.37 },
+    { w: "WOMBAT",     zipf: 2.58 },
   ]},
 ];
 
